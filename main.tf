@@ -1,21 +1,49 @@
-module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "5.8.0"
+provider "aws" {
+  region = "us-west-2"
+  profile = "personal-aws"
+}
 
-  name = var.vpc_name
-  azs  = var.azs
-  cidr = var.vpc_base_cidr
+resource "aws_vpc" "main" {
+  cidr_block = "10.0.0.0/16"
 
-  enable_nat_gateway     = true
-  single_nat_gateway     = true
-  enable_dns_hostnames   = var.enable_dns_hostnames
-  enable_dns_support     = var.enable_dns_support
-  one_nat_gateway_per_az = var.one_nat_gateway_per_az
+  tags = {
+    Name = "main-vpc"
+  }
+}
 
-  private_subnets      = var.private_subnets
-  private_subnet_tags  = var.private_subnet_tags
-  public_subnets       = var.public_subnets
-  public_subnet_tags   = var.public_subnet_tags
-  database_subnets     = var.database_subnets
-  database_subnet_tags = var.database_subnets_tags
-  create_database_subnet_group = false # without this value again creating dbsubnetgroup which already exists
+resource "aws_subnet" "public" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.1.0/24"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "public-subnet"
+  }
+}
+
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "main-igw"
+  }
+}
+
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    Name = "public-route-table"
+  }
+}
+
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
+}
+
